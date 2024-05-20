@@ -1,15 +1,26 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"net/http"
+    "path"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hello!")
+}
+
+func recipeHandler(w http.ResponseWriter, r *http.Request) {
+    recipeName := path.Base(r.URL.Path)
+    fmt.Println(recipeName)
+    var recipe Recipe
+    LoadRecipe(recipeName + ".txt", &recipe)
+    fmt.Fprintf(w, "Title: %s\nDescription: %s\nIngredients: %v", recipe.Title, recipe.Description, recipe.Ingredients)
+}
 
 func main() {
-    
-    recipe := &Recipe{"Ravioli", "Tasty classic", []string{"Pasta", "Sauce"}};
-    recipe.Save();
-    var r Recipe
-    err := LoadRecipe("Ravioli.txt", &r);
-    if (err != nil) {
-        fmt.Println("Failed to load recipe!");
-    }
-    fmt.Println(r.Title);
+    http.HandleFunc("/", handler)
+    http.HandleFunc("/recipe/", recipeHandler)
+    log.Fatal(http.ListenAndServe(":8080", nil))
 }
