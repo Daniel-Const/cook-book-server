@@ -1,49 +1,68 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-    "path"
-    "encoding/json"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintf(w, "Hello!")
+	fmt.Fprintf(w, "Hello!")
 }
 
+const (
+	DefaultPort = "8080"
+	RecipeRoute = "/recipe/"
+)
+
+// /recipe/ Handler
 func recipeHandler(w http.ResponseWriter, r *http.Request) {
 
-    switch r.Method {
-    case http.MethodGet:
-        recipeName := path.Base(r.URL.Path)
-        log.Println("Fetching: ", recipeName)
-        recipe, err := LoadRecipe(recipeName + ".txt")
-        if err != nil {
-            log.Println("Failed to load Recipe")
-            fmt.Fprintf(w, "Failed to load recipe: %s", err.Error())
-            return
-        }
-        fmt.Fprintf(w, "Title: %s\nDescription: %s\nIngredients: %v", recipe.Title, recipe.Description, recipe.Ingredients)
-    case http.MethodPost:
-        d := json.NewDecoder(r.Body)
-        d.DisallowUnknownFields()
+	switch r.Method {
 
-        var recipe Recipe
-        err := d.Decode(&recipe)
-        if err != nil {
-            http.Error(w, "Oopsie", http.StatusBadRequest)
-            return
-        }
-        recipe.Save()
+	case http.MethodGet:
+		encoder := json.NewEncoder(w)
+		w.Header().Set("Content-Type", "application/json")
 
-    default:
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-    }
+		recipeName := r.URL.Path[len(RecipeRoute):]
+
+		// Fetch all recipes
+		if recipeName == "" {
+			recipes := LoadAllRecipes()
+			encoder.Encode(recipes)
+			return
+		}
+
+		log.Println("Fetching: ", recipeName)
+		recipe, err := LoadRecipe(recipeName + ".txt")
+		if err != nil {
+			log.Println("Failed to load Recipe")
+			fmt.Fprintf(w, "Failed to load recipe: %s", err.Error())
+			return
+		}
+		encoder.Encode(recipe)
+
+	case http.MethodPost:
+		d := json.NewDecoder(r.Body)
+		d.DisallowUnknownFields()
+
+		var recipe Recipe
+		err := d.Decode(&recipe)
+		if err != nil {
+			http.Error(w, "Oopsie", http.StatusBadRequest)
+			return
+		}
+		recipe.Save()
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func main() {
-    http.HandleFunc("/", handler)
-    http.HandleFunc("/recipe/", recipeHandler)
-    log.Fatal(http.ListenAndServe(":8080", nil))
+	http.HandleFunc("/", handler)
+	http.HandleFunc(RecipeRoute, recipeHandler)
+	log.Printf("Server is litening on port %s...", DefaultPort)
+	log.Fatal(http.ListenAndServe(":"+DefaultPort, nil))
 }
